@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 
 import pytest
-from conftest import PLUGINS, REAL_ROLES, fetch, import_plugin, make_kernel
+from conftest import PLUGINS, REAL_ROLES, REPO, fetch, import_plugin, make_kernel
 
 from ngui import NguiError
 from ngui.loader import load
@@ -91,3 +91,63 @@ def test_store_page_renders(home, start_app):
     body = fetch(url + "/store")
     assert "Plugin Mağazası" in body and "storage-sqlite" in body and "Çalışıyor" in body
     assert "Bu alan çizilirken bir hata oluştu." not in body and "yetkiniz yok" not in body
+
+
+class FakeControl:
+    enabled = True
+
+    def set_enabled(self, value):
+        self.enabled = value
+
+
+def _page():
+    ctx = SimpleNamespace(t=lambda k, **v: k, role=lambda r: None, kernel=SimpleNamespace(manager=None))
+    return store.StorePage(ctx)
+
+
+def test_lock_without_spinner_and_late_controls_reenable():
+    page = _page()
+    early, off = FakeControl(), FakeControl()
+    page.controls = [early]
+    page._lock(True)  # no spinner rendered: must not raise
+    assert not early.enabled and page.locked
+    late = FakeControl()  # a catalog button created while the action runs
+    late.set_enabled(False)
+    page.controls += [late, off]
+    page.off.append(off)
+    page._lock(False)
+    assert early.enabled and late.enabled and not off.enabled and not page.locked
+
+
+def test_url_install_confirms_with_the_url():
+    import asyncio
+    page, calls = _page(), []
+
+    async def act(*args, **kw):
+        calls.append((args, kw))
+    page.act = act
+    asyncio.run(page.install("  "))
+    asyncio.run(page.install(" https://x/nicegui-plugin-a "))
+    assert calls == [(("add", "https://x/nicegui-plugin-a"), {"confirm": "confirm.install"})]
+
+
+def test_core_actions_include_rollback_with_confirm():
+    assert store.CORE_ACTIONS == {"update.core": ("update", None), "rollback.core": ("rollback", "confirm.rollback")}
+
+
+def test_core_store_shows_core_commit_rollback_and_description(home, start_app):
+    import shutil
+    import subprocess
+
+    from ngui.config import CORE_KEY, LockEntry
+    core = home.repos_dir / CORE_KEY
+    for p in PLUGINS:
+        shutil.copytree(REPO / p, core / p)
+    for cmd in (["init", "-q"], ["add", "-A"], ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "c"]):
+        subprocess.run(["git", *cmd], cwd=core, check=True)
+    sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=core, check=True, capture_output=True, text=True).stdout
+    home.save_lock({CORE_KEY: LockEntry("file:///core", sha.strip())})
+    _, url = start_app(home, PLUGINS, REAL_ROLES, linked=False)
+    body = fetch(url + "/store")
+    assert "Core'u geri al" in body and "Core'u güncelle" in body and sha[:7] in body
+    assert "SQLite depolama" in body and "Eklenti verisini SQLite dosyasında saklar." in body

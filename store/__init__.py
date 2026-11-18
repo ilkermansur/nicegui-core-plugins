@@ -1,7 +1,9 @@
 from nicegui import run, ui
 
 from ngui import NguiError
+from ngui.config import CORE_KEY
 from ngui.loader import read_manifests
+from ngui.manifest import localized
 from ngui.roles import ROLE_ORDER
 
 ACTIONS = {"add", "remove", "update", "rollback", "enable", "disable", "use"}
@@ -10,6 +12,7 @@ COLUMNS = ("name", "source", "role", "commit", "status")
 ICONS = {"enable": "toggle_off", "disable": "toggle_on", "update": "system_update",
          "rollback": "history", "remove": "delete", "purge": "delete_sweep"}
 DANGER = {"remove", "purge"}
+CORE_ACTIONS = {"update.core": ("update", None), "rollback.core": ("rollback", "confirm.rollback")}
 GRID = "minmax(112px, 2fr) repeat(3, auto) minmax(64px, 1fr) auto"
 CSS = """
 .ngui-store-scroll { width: 100%; max-width: 100%; min-width: 0; overflow-x: auto; }
@@ -54,11 +57,18 @@ def row_actions(row, self_id: str) -> list[str]:
     return [*acts, "purge"]
 
 
+def short_commit(row, lock: dict) -> str:
+    """Core plugins have no lock entry of their own; they show the core-plugins repo commit."""
+    entry = lock.get(CORE_KEY) if row.source == "core" else None
+    return (entry.commit if entry else row.commit)[:7]
+
+
 class StorePage:
     def __init__(self, ctx):
         self.ctx, self.t, self.theme = ctx, ctx.t, ctx.role("theme")
         self.manager = ctx.kernel.manager
-        self.controls = []
+        self.controls, self.off = [], []  # `off`: controls that stay disabled (installed catalog entries)
+        self.spinner = None
         self.locked = False  # an action is running or succeeded and the app restarts
 
     def _button(self, key: str, on_click):
@@ -85,8 +95,7 @@ class StorePage:
 
     async def _guarded(self, fn, *args, hold: bool = False) -> bool:
         """Run `fn` in a thread with the controls locked; notify a failure. `hold` keeps them locked on success."""
-        busy = [c for c in self.controls if c.enabled]
-        self._lock(busy, True)
+        self._lock(True)
         try:
             err = await run.io_bound(fn, *args)
             msg = err and self.ctx.i18n.t("core", err[0], **err[1])
@@ -94,15 +103,21 @@ class StorePage:
             self.ctx.log.exception("store: %s%r failed", getattr(fn, "__name__", fn), args)
             msg = self.t("error.unexpected")
         if msg or not hold:
-            self._lock(busy, False)
+            self._lock(False)
         if msg:
             ui.notify(msg, type="negative", multi_line=True)
         return not msg
 
-    def _lock(self, controls, locked: bool) -> None:
-        self.locked = self.spinner.visible = locked
-        for c in controls:
-            c.set_enabled(not locked)
+    def _lock(self, locked: bool) -> None:
+        self.locked = locked
+        if self.spinner:
+            self.spinner.visible = locked
+        for c in self.controls:
+            c.set_enabled(not locked and c not in self.off)
+
+    async def install(self, url: str) -> None:
+        if url := url.strip():
+            await self.act("add", url, confirm="confirm.install")
 
     async def purge(self, pid: str) -> None:
         if await self._confirm("confirm.purge", id=pid) and await self._guarded(self.ctx.role("storage").purge, pid):
@@ -112,7 +127,7 @@ class StorePage:
         cfg = self.ctx.kernel.home.load_config()
         self.manifests = read_manifests(self.ctx.kernel.home, cfg)[0]
         self.lang = self.ctx.i18n.current_lang()
-        self.rows = self.manager.status()
+        self.rows, self.lock = self.manager.status(), self.ctx.kernel.home.load_lock()
         self.theme.page_header(self.t("title"), self.t("description"))
         self._installed()
         self._catalog()
@@ -120,14 +135,15 @@ class StorePage:
 
     def _name(self, pid: str) -> str:
         m = self.manifests.get(pid)
-        return (m.name.get(self.lang) or pid) if m else pid
+        return (localized(m.name, self.lang) or pid) if m else pid
 
     def _installed(self) -> None:
         def actions():
             self.spinner = ui.spinner(size="1.25em")
             self.spinner.visible = False
             if any(r.source == "core" for r in self.rows):
-                self._button("update.core", lambda: self.act("update", "core"))
+                for key, (action, confirm) in CORE_ACTIONS.items():
+                    self._button(key, lambda action=action, confirm=confirm: self.act(action, "core", confirm=confirm))
 
         with self.theme.card(self.t("installed"), actions).classes("w-full"):
             with ui.element("div").classes("ngui-store-scroll"), ui.grid(columns=GRID):
@@ -138,12 +154,15 @@ class StorePage:
                     self._row(r)
 
     def _row(self, r) -> None:
+        m = self.manifests.get(r.id)
         with ui.column().classes("gap-0"):
             ui.label(self._name(r.id))
+            if m and (desc := localized(m.description, self.lang)):
+                ui.label(desc).classes("ngui-store-desc")
             ui.label(r.id).classes("ngui-store-id")
         ui.label(r.source)
         ui.label(r.role)
-        ui.label(r.commit[:7])
+        ui.label(short_commit(r, self.lock))
         if r.problem:
             ui.label(r.problem).classes("ngui-tone-danger")
         else:
@@ -172,7 +191,7 @@ class StorePage:
                 ui.spinner(size="1.25em")
             with ui.row().classes("w-full items-center no-wrap"):
                 url = ui.input(self.t("install.url")).classes("grow")
-                self._button("install", lambda: url.value.strip() and self.act("add", url.value.strip()))
+                self._button("install", lambda: self.install(url.value))
 
         async def fill():
             entries = await run.io_bound(self.manager.catalog)
@@ -187,7 +206,9 @@ class StorePage:
                             ui.label(e.id)
                             ui.label(e.description).classes("ngui-store-desc")
                         btn = self._button("install", lambda e=e: self.act("add", e.url))
-                        btn.set_enabled(e.id not in installed and not self.locked)
+                        if e.id in installed:
+                            self.off.append(btn)
+                        btn.set_enabled(not self.locked and e.id not in installed)
 
         ui.timer(0, fill, once=True)
 

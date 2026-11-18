@@ -27,9 +27,9 @@ def home(tmp_path):
 
 
 def _write_config(home: Home, plugins: list[str], roles: dict[str, str],
-                  links: dict[str, str] | None = None, **fields) -> Config:
-    cfg = Config(core_repo="", enabled=list(plugins), roles=dict(roles),
-                 links={p: str(REPO / p) for p in plugins} | (links or {}), **fields)
+                  links: dict[str, str] | None = None, linked: bool = True, **fields) -> Config:
+    own = {p: str(REPO / p) for p in plugins} if linked else {}
+    cfg = Config(core_repo="", enabled=list(plugins), roles=dict(roles), links=own | (links or {}), **fields)
     home.save_config(cfg)
     return cfg
 
@@ -77,8 +77,8 @@ def start_app(tmp_path):
     log_path = tmp_path / "app.log"
 
     def start(home: Home, plugins: list[str], roles: dict[str, str], env: dict[str, str] | None = None,
-              links: dict[str, str] | None = None, **config):
-        _write_config(home, plugins, roles, links, **config)
+              links: dict[str, str] | None = None, linked: bool = True, **config):
+        _write_config(home, plugins, roles, links, linked, **config)
         port = _free_port()
         full = {k: v for k, v in os.environ.items() if k != "PYTEST_CURRENT_TEST"}
         full.update(env or {}, NGUI_HOME=str(home.root), NGUI_PORT=str(port), NGUI_CORE_REPO="")
