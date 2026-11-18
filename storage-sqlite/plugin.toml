@@ -1,5 +1,6 @@
 id = "storage-sqlite"
 version = "0.1.0"
+core = ">=1,<2"
 provides = "storage"
 
 [name]

@@ -67,8 +67,7 @@ def test_outside_request_raises(storage, monkeypatch):
     storage.for_plugin("p").for_user("u1").set("k", 1)
 
 
-def test_real_in_request_check_false_outside_page(monkeypatch):
-    import importlib
+def test_real_in_request_check_false_outside_page():
     fresh = import_plugin("storage-sqlite")
     assert fresh.in_request() is False
 
