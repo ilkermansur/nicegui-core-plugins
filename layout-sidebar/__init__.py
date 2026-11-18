@@ -229,5 +229,7 @@ class SidebarLayout:
 
 
 def setup(ctx) -> SidebarLayout:
+    for role in ("storage", "auth", "theme"):  # a missing role breaks layout, so recovery serves every path
+        ctx.role(role)
     ui.add_css(CSS, shared=True)
     return SidebarLayout(ctx)

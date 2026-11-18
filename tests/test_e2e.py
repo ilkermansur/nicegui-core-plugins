@@ -88,3 +88,10 @@ def test_forbidden_and_failing_pages_keep_the_frame(home, start_app, tmp_path):
     boom = fetch(url + "/boom")
     assert "Bu alan çizilirken bir hata oluştu." in boom and "kaboom" not in boom
     assert "ngui" in boom and "Ana sayfa" in boom  # frame intact
+
+
+def test_missing_role_serves_recovery_not_500(home, start_app):
+    _, url = start_app(home, PLUGINS, REAL_ROLES | {"storage": "nope"})
+    for path in ("/", "/store"):
+        html = fetch(url + path)  # raises on a 500
+        assert "Kurtarma" in html, path
