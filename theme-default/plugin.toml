@@ -1,0 +1,12 @@
+id = "theme-default"
+version = "0.1.0"
+core = ">=1,<2"
+provides = "theme"
+
+[name]
+tr = "Varsayılan tema"
+en = "Default theme"
+
+[description]
+tr = "Açık/koyu mod, tasarım değişkenleri ve kart, KPI, sayfa başlığı bileşenleri."
+en = "Light/dark mode, design tokens, and card, KPI and page header components."

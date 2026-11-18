@@ -1,0 +1,58 @@
+:root {
+  --ngui-bg: #f5f6f8;
+  --ngui-surface: #ffffff;
+  --ngui-border: #e5e7eb;
+  --ngui-text: #111827;
+  --ngui-muted: #6b7280;
+  --ngui-primary: #1f2937;
+  --ngui-success: #16a34a;
+  --ngui-warning: #b45309;
+  --ngui-danger: #dc2626;
+  --ngui-neutral: #6b7280;
+  --ngui-radius: 8px;
+  --ngui-gap: 12px;
+}
+body.body--dark {
+  --ngui-bg: #0f1115;
+  --ngui-surface: #171a21;
+  --ngui-border: #262a33;
+  --ngui-text: #e5e7eb;
+  --ngui-muted: #9ca3af;
+  --ngui-primary: #e5e7eb;
+  --ngui-success: #22c55e;
+  --ngui-warning: #f59e0b;
+  --ngui-danger: #f87171;
+  --ngui-neutral: #9ca3af;
+  --q-primary: var(--ngui-primary);
+  --q-dark-page: var(--ngui-bg);
+}
+body, body.body--dark { background: var(--ngui-bg); color: var(--ngui-text); }
+.q-page, .q-layout { background: var(--ngui-bg); }
+.q-card { box-shadow: none; }
+.ngui-card {
+  background: var(--ngui-surface);
+  border: 1px solid var(--ngui-border);
+  border-radius: var(--ngui-radius);
+  box-shadow: none;
+  padding: 16px;
+  gap: var(--ngui-gap);
+}
+.ngui-card-title { font-size: 1rem; font-weight: 600; color: var(--ngui-text); }
+.ngui-kpi { position: relative; padding: 14px 16px; gap: 4px; }
+.ngui-kpi-label {
+  font-size: 0.75rem; font-weight: 500; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--ngui-muted);
+}
+.ngui-kpi-value { font-size: 2rem; font-weight: 700; line-height: 1.2; }
+.ngui-kpi-icon { position: absolute; top: 14px; right: 16px; font-size: 1.25rem; }
+.ngui-tone-neutral { color: var(--ngui-neutral); }
+.ngui-tone-success { color: var(--ngui-success); }
+.ngui-tone-warning { color: var(--ngui-warning); }
+.ngui-tone-danger { color: var(--ngui-danger); }
+.ngui-kpi-value.ngui-tone-neutral { color: var(--ngui-text); }
+.ngui-page-header {
+  padding-bottom: 16px; margin-bottom: var(--ngui-gap);
+  border-bottom: 1px solid var(--ngui-border); width: 100%; gap: 4px;
+}
+.ngui-page-title { font-size: 1.5rem; font-weight: 700; color: var(--ngui-text); }
+.ngui-page-desc { font-size: 0.875rem; color: var(--ngui-muted); }
