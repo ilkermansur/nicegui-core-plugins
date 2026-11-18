@@ -1,0 +1,13 @@
+id = "store"
+version = "0.1.0"
+core = ">=1,<2"
+requires = []
+permissions = ["store.manage"]
+
+[name]
+tr = "Plugin mağazası"
+en = "Plugin store"
+
+[description]
+tr = "Plugin kurma, güncelleme, kaldırma ve rol atama ekranı."
+en = "Install, update and remove plugins and assign roles."
