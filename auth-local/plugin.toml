@@ -1,0 +1,12 @@
+id = "auth-local"
+version = "0.1.0"
+core = ">=1,<2"
+provides = "auth"
+
+[name]
+tr = "Yerel kimlik"
+en = "Local auth"
+
+[description]
+tr = "Tek kullanıcılı yerel kullanım için her zaman yönetici kimliği döndürür."
+en = "Single-user local mode that always acts as administrator."
