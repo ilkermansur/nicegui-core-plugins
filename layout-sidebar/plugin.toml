@@ -1,0 +1,13 @@
+id = "layout-sidebar"
+version = "0.1.0"
+core = ">=1,<2"
+provides = "layout"
+requires = []
+
+[name]
+tr = "Kenar menülü yerleşim"
+en = "Sidebar layout"
+
+[description]
+tr = "Üst bar, ikon menü, sayfa yolu ve ana sayfa ile uygulama iskeleti."
+en = "App shell with top bar, icon rail, breadcrumb and home page."
