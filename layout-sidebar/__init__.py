@@ -74,25 +74,18 @@ class SidebarLayout:
             self._ctx.log.warning("a page registered at '/' replaces the layout's home page")
 
         def decorator(fn):
-            if inspect.iscoroutinefunction(fn):
-                @functools.wraps(fn)
-                async def wrapper(*args, **kwargs):
-                    with self.frame(entry):
-                        if self._allowed(entry):
-                            try:
-                                await fn(*args, **kwargs)
-                            except Exception:
-                                self._render_error(fn)
-                        else:
-                            self._forbidden()
-            else:
-                @functools.wraps(fn)
-                def wrapper(*args, **kwargs):
-                    with self.frame(entry):
-                        if self._allowed(entry):
-                            self._safe(fn, *args, **kwargs)
-                        else:
-                            self._forbidden()
+            @functools.wraps(fn)
+            async def wrapper(*args, **kwargs):
+                with self.frame(entry):
+                    if not self._allowed(entry):
+                        self._forbidden()
+                        return
+                    try:
+                        res = fn(*args, **kwargs)
+                        if inspect.isawaitable(res):
+                            await res
+                    except Exception:
+                        self._render_error(fn)
 
             ui.page(path)(wrapper)
             return fn
