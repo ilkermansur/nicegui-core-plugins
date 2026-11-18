@@ -23,9 +23,10 @@ body.body--dark {
   --ngui-warning: #f59e0b;
   --ngui-danger: #f87171;
   --ngui-neutral: #9ca3af;
-  --q-primary: var(--ngui-primary);
+  --q-primary: var(--ngui-primary) !important;  /* app.colors() sets the light value inline */
   --q-dark-page: var(--ngui-bg);
 }
+body.body--dark .q-btn.bg-primary .q-btn__content { color: var(--ngui-bg); }  /* light primary needs dark text; .text-white sits in a stronger layer, so style the content */
 body, body.body--dark { background: var(--ngui-bg); color: var(--ngui-text); }
 .q-page, .q-layout { background: var(--ngui-bg); }
 .q-card { box-shadow: none; }

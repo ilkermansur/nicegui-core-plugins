@@ -69,3 +69,11 @@ def test_set_mode_writes_only_on_change(monkeypatch):
 def test_no_unused_mode_keys():
     for lang in ("tr", "en"):
         assert "mode." not in (REPO / "theme-default" / "locales" / f"{lang}.toml").read_text()
+
+
+def test_dark_primary_beats_the_inline_light_value():
+    # app.colors() writes the light --q-primary inline; dark mode must still win, and primary
+    # buttons need dark text on the light primary
+    css = (REPO / "theme-default" / "theme.css").read_text()
+    assert "--q-primary: var(--ngui-primary) !important" in css
+    assert "body.body--dark .q-btn.bg-primary .q-btn__content" in css
