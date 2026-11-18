@@ -5,10 +5,10 @@ ngui platformunun beş çekirdek plugin'ini barındıran repo. ngui çekirdeği 
 | id | rol | ne yapar |
 |----|-----|----------|
 | `storage-sqlite` | storage | Plugin başına anahtar-değer verisini SQLite'ta saklar |
-| `auth-local` | auth | Yerel kullanıcı adı/parola ile giriş ve oturum yönetimi |
-| `theme-default` | theme | Varsayılan renk ve görünüm teması |
-| `layout-sidebar` | layout | Kenar çubuklu sayfa yerleşimi |
-| `store` | - | Plugin mağazası: plugin'leri listeler, kurar ve kaldırır |
+| `auth-local` | auth | Tek yerel kullanıcı ("Yönetici"), her izni verir; gerçek giriş ayrı bir auth plugin'inin işi |
+| `theme-default` | theme | Açık/koyu mod, renk değişkenleri, kart/KPI/sayfa başlığı yardımcıları |
+| `layout-sidebar` | layout | Üst bar, ikon menü, breadcrumb, ana sayfa; sayfa/menü kaydı |
+| `store` | - | Kurulu plugin'ler, katalog, URL ile kurma, rol atama, güncelle/geri al |
 
 Plugin sözleşmesi: [CONTRACT.md](https://github.com/ilkermansur/nicegui-core/blob/main/CONTRACT.md)
 
