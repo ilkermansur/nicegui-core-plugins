@@ -27,3 +27,4 @@
 "col.commit" = "Commit"
 "col.status" = "Status"
 "status.ok" = "Running"
+"error.unexpected" = "An unexpected error occurred; see the log for details."

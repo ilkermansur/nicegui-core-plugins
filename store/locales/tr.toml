@@ -27,3 +27,4 @@
 "col.commit" = "Commit"
 "col.status" = "Durum"
 "status.ok" = "Çalışıyor"
+"error.unexpected" = "Beklenmeyen bir hata oluştu; ayrıntı günlükte."

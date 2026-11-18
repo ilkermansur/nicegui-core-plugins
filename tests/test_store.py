@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 import pytest
 from conftest import PLUGINS, REAL_ROLES, fetch, import_plugin, make_kernel
 
@@ -5,7 +7,8 @@ from ngui import NguiError
 from ngui.loader import load
 from ngui.manager import Manager
 
-run_action = import_plugin("store").run_action
+store = import_plugin("store")
+run_action, role_options = store.run_action, store.role_options
 
 
 class FakeManager:
@@ -43,6 +46,17 @@ def test_run_action_deps_error():
 def test_run_action_rejects_unknown_action():
     with pytest.raises(ValueError):
         run_action(FakeManager(), "rm_rf", "/")
+
+
+def test_role_options_lists_providers_only():
+    ms = {"a": SimpleNamespace(provides="theme"), "b": SimpleNamespace(provides="auth")}
+    assert role_options(ms, "theme", "a", str.upper) == {"a": "A"}
+
+
+def test_role_options_keeps_assigned_plugin_without_manifest():
+    ms = {"a": SimpleNamespace(provides="theme")}
+    assert role_options(ms, "theme", "broken", str.upper) == {"a": "A", "broken": "broken"}
+    assert role_options(ms, "auth", None, str.upper) == {}
 
 
 def test_store_registers_page(home):

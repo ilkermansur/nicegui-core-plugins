@@ -29,6 +29,14 @@ def run_action(manager, action: str, *args) -> tuple[str, dict] | None:
     return None
 
 
+def role_options(manifests: dict, role: str, current: str | None, name) -> dict[str, str]:
+    """Plugins that can fill `role`, plus the assigned one even if its manifest is unreadable."""
+    options = {pid: name(pid) for pid, m in manifests.items() if m.provides == role}
+    if current and current not in options:
+        options[current] = current
+    return options
+
+
 class StorePage:
     def __init__(self, ctx):
         self.ctx, self.t, self.theme = ctx, ctx.t, ctx.role("theme")
@@ -54,19 +62,25 @@ class StorePage:
     async def act(self, action: str, *args, confirm: str | None = None) -> None:
         if confirm and not await self._confirm(confirm, id=args[-1], role=args[0]):
             return
+        if await self._guarded(run_action, self.manager, action, *args, hold=True):
+            ui.notify(self.t("restarting"), type="positive")
+            ui.timer(0.8, self.ctx.kernel.restart, once=True)
+
+    async def _guarded(self, fn, *args, hold: bool = False) -> bool:
+        """Run `fn` in a thread with the controls locked; notify a failure. `hold` keeps them locked on success."""
         busy = [c for c in self.controls if c.enabled]
         self._lock(busy, True)
         try:
-            err = await run.io_bound(run_action, self.manager, action, *args)
-        except BaseException:
+            err = await run.io_bound(fn, *args)
+            msg = err and self.ctx.i18n.t("core", err[0], **err[1])
+        except Exception:
+            self.ctx.log.exception("store: %s%r failed", getattr(fn, "__name__", fn), args)
+            msg = self.t("error.unexpected")
+        if msg or not hold:
             self._lock(busy, False)
-            raise
-        if err:
-            self._lock(busy, False)
-            ui.notify(self.ctx.i18n.t("core", err[0], **err[1]), type="negative", multi_line=True)
-            return
-        ui.notify(self.t("restarting"), type="positive")
-        ui.timer(0.8, self.ctx.kernel.restart, once=True)
+        if msg:
+            ui.notify(msg, type="negative", multi_line=True)
+        return not msg
 
     def _lock(self, controls, locked: bool) -> None:
         self.locked = self.spinner.visible = locked
@@ -74,8 +88,7 @@ class StorePage:
             c.set_enabled(not locked)
 
     async def purge(self, pid: str) -> None:
-        if await self._confirm("confirm.purge", id=pid):
-            self.ctx.role("storage").purge(pid)
+        if await self._confirm("confirm.purge", id=pid) and await self._guarded(self.ctx.role("storage").purge, pid):
             ui.notify(self.t("purged", id=pid), type="positive")
 
     def render(self) -> None:
@@ -159,8 +172,9 @@ class StorePage:
         with self.theme.card(self.t("roles")).classes("w-full"):
             with ui.grid(columns="repeat(auto-fill, minmax(220px, 1fr))").classes("w-full"):
                 for role in ROLE_ORDER:
-                    options = {pid: self._name(pid) for pid, m in self.manifests.items() if m.provides == role}
-                    self.controls.append(ui.select(options, label=role, value=cfg.roles.get(role),
+                    current = cfg.roles.get(role)
+                    options = role_options(self.manifests, role, current, self._name)
+                    self.controls.append(ui.select(options, label=role, value=current,
                                                    on_change=lambda e, role=role: self._use(e, role)))
 
     async def _use(self, e, role: str) -> None:
