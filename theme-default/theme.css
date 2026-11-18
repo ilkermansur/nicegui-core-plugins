@@ -46,6 +46,7 @@ body, body.body--dark { background: var(--ngui-bg); color: var(--ngui-text); }
 .ngui-kpi-value { font-size: 2rem; font-weight: 700; line-height: 1.2; }
 .ngui-kpi-icon { position: absolute; top: 14px; right: 16px; font-size: 1.25rem; }
 .ngui-tone-neutral { color: var(--ngui-neutral); }
+.ngui-tone-primary { color: var(--ngui-primary); }
 .ngui-tone-success { color: var(--ngui-success); }
 .ngui-tone-warning { color: var(--ngui-warning); }
 .ngui-tone-danger { color: var(--ngui-danger); }

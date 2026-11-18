@@ -17,7 +17,7 @@ def test_locales_complete_and_equal(plugin):
     _need(plugin)
     tr = tomllib.loads((REPO / plugin / "locales" / "tr.toml").read_text())
     en = tomllib.loads((REPO / plugin / "locales" / "en.toml").read_text())
-    assert tr and set(tr) == set(en)
+    assert (tr or plugin == "theme-default") and set(tr) == set(en)  # theme has no UI text
     assert all(isinstance(v, str) for v in [*tr.values(), *en.values()])
 
 

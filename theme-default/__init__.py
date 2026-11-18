@@ -1,7 +1,7 @@
 from nicegui import app, ui
 
 MODES = {"light": False, "dark": True, "auto": None}
-TONES = {"neutral", "success", "warning", "danger"}
+TONES = {"neutral", "primary", "success", "warning", "danger"}
 
 
 class DefaultTheme:
@@ -11,14 +11,16 @@ class DefaultTheme:
     @property
     def mode(self) -> str:
         try:
-            return self._ctx.storage.get("mode", "auto")
+            m = self._ctx.storage.get("mode", "auto")
         except Exception:  # storage is per-user and unavailable outside a request
             return "auto"
+        return m if m in MODES else "auto"
 
     def set_mode(self, mode: str) -> None:
         if mode not in MODES:
             raise ValueError(f"unknown mode: {mode!r}")
-        self._ctx.storage.set("mode", mode)
+        if mode != self.mode:
+            self._ctx.storage.set("mode", mode)
         ui.dark_mode(MODES[mode])
 
     def card(self, title: str | None = None, actions=None):
