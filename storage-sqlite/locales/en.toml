@@ -1,0 +1,1 @@
+"err.no_request" = "User data is only available inside a page request; use .shared or .for_user(id)."

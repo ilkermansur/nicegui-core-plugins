@@ -1,0 +1,11 @@
+id = "storage-sqlite"
+version = "0.1.0"
+provides = "storage"
+
+[name]
+tr = "SQLite depolama"
+en = "SQLite storage"
+
+[description]
+tr = "Eklenti verisini SQLite dosyasında saklar."
+en = "Stores plugin data in a SQLite file."

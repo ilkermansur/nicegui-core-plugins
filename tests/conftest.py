@@ -95,3 +95,13 @@ def start_app(tmp_path):
         except subprocess.TimeoutExpired:
             proc.kill()
             proc.wait()
+
+
+def import_plugin(name: str):
+    import importlib.util
+    mod_name = "cp_" + name.replace("-", "_")
+    spec = importlib.util.spec_from_file_location(mod_name, REPO / name / "__init__.py")
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[mod_name] = mod
+    spec.loader.exec_module(mod)
+    return mod
