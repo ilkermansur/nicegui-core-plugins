@@ -41,3 +41,55 @@ def test_home_page_renders_shell(home, start_app):
     _, url = start_app(home, PLUGINS_, REAL_ROLES)
     body = fetch(url + "/")
     assert "ngui-app-name" in body and "ngui-rail" in body and "Ana sayfa" in body
+
+
+def test_title_that_raises_falls_back_to_path(loaded):
+    layout = loaded.roles["layout"]
+
+    def boom():
+        raise RuntimeError("bad title")
+
+    layout.page("/bad", boom)(lambda: None)
+    assert layout._text(layout.pages[-1]) == "/bad"
+
+
+def test_permission_check_that_raises_is_not_allowed(loaded):
+    layout = loaded.roles["layout"]
+    layout.page("/p", "P", permission="x")(lambda: None)
+    loaded.roles["auth"].has = lambda p: 1 / 0
+    assert layout._allowed(layout.pages[-1]) is False
+
+
+DEMO_INIT = '''import asyncio
+
+from nicegui import ui
+
+
+def setup(ctx):
+    @ctx.role("layout").page("/async", "Async", icon="bolt")
+    async def page():
+        await asyncio.sleep(0)
+        ui.label("async-page-rendered")
+'''
+
+
+def test_async_page_is_awaited(home, tmp_path, start_app, monkeypatch):
+    import conftest
+    demo = tmp_path / "demo"
+    (demo / "locales").mkdir(parents=True)
+    names = '{ tr = "demo", en = "demo" }'
+    (demo / "plugin.toml").write_text(f'id = "demo"\nversion = "0.1.0"\ncore = ">=1,<2"\n'
+                                      f'name = {names}\ndescription = {names}\n')
+    (demo / "__init__.py").write_text(DEMO_INIT)
+    orig = conftest._write_config
+
+    def write(h, plugins, roles):
+        cfg = orig(h, plugins, roles)
+        cfg.links["demo"] = str(demo)
+        h.save_config(cfg)
+        return cfg
+
+    monkeypatch.setattr(conftest, "_write_config", write)
+    _, url = start_app(home, [*PLUGINS_, "demo"], REAL_ROLES)
+    body = fetch(url + "/async")
+    assert "async-page-rendered" in body and "ngui-rail" in body

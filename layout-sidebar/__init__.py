@@ -1,4 +1,5 @@
 import functools
+import inspect
 from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -57,10 +58,6 @@ class PageEntry:
     permission: str | None = None
 
 
-def _text(value) -> str:
-    return value() if callable(value) else value
-
-
 class SidebarLayout:
     def __init__(self, ctx):
         self._ctx = ctx
@@ -73,14 +70,29 @@ class SidebarLayout:
         entry = PageEntry(path, title, icon, permission)
         self.pages.append(entry)
 
+        if path == "/":
+            self._ctx.log.warning("a page registered at '/' replaces the layout's home page")
+
         def decorator(fn):
-            @functools.wraps(fn)
-            def wrapper(*args, **kwargs):
-                with self.frame(entry):
-                    if self._allowed(entry):
-                        self._safe(fn, *args, **kwargs)
-                    else:
-                        ui.label(self._ctx.t("forbidden")).classes("ngui-forbidden")
+            if inspect.iscoroutinefunction(fn):
+                @functools.wraps(fn)
+                async def wrapper(*args, **kwargs):
+                    with self.frame(entry):
+                        if self._allowed(entry):
+                            try:
+                                await fn(*args, **kwargs)
+                            except Exception:
+                                self._render_error(fn)
+                        else:
+                            self._forbidden()
+            else:
+                @functools.wraps(fn)
+                def wrapper(*args, **kwargs):
+                    with self.frame(entry):
+                        if self._allowed(entry):
+                            self._safe(fn, *args, **kwargs)
+                        else:
+                            self._forbidden()
 
             ui.page(path)(wrapper)
             return fn
@@ -90,15 +102,32 @@ class SidebarLayout:
         if slot in SLOTS:
             self.slots[slot].append(builder)
 
+    def _text(self, entry: PageEntry) -> str:
+        try:
+            return entry.title() if callable(entry.title) else entry.title
+        except Exception:
+            self._ctx.log.exception("title failed for %s", entry.path)
+            return entry.path
+
     def _allowed(self, entry: PageEntry) -> bool:
-        return not entry.permission or self._ctx.role("auth").has(entry.permission)
+        try:
+            return not entry.permission or bool(self._ctx.role("auth").has(entry.permission))
+        except Exception:
+            self._ctx.log.exception("permission check failed for %s", entry.path)
+            return False
+
+    def _forbidden(self) -> None:
+        ui.label(self._ctx.t("forbidden")).classes("ngui-forbidden")
+
+    def _render_error(self, fn) -> None:
+        self._ctx.log.exception("render failed: %s", getattr(fn, "__qualname__", fn))
+        ui.label(self._ctx.t("error.render")).classes("ngui-error")
 
     def _safe(self, fn, *args, **kwargs) -> None:
         try:
             fn(*args, **kwargs)
         except Exception:
-            self._ctx.log.exception("render failed: %s", getattr(fn, "__qualname__", fn))
-            ui.label(self._ctx.t("error.render")).classes("ngui-error")
+            self._render_error(fn)
 
     def _slot(self, name: str) -> None:
         for builder in self.slots[name]:
@@ -149,7 +178,7 @@ class SidebarLayout:
         tips = []
         with drawer:
             for page in [self.home, *filter(self._allowed, self.pages)]:
-                title = _text(page.title)
+                title = self._text(page)
                 active = " ngui-active" if page.path == entry.path else ""
                 with ui.link(target=page.path).classes("ngui-nav-item" + active):
                     ui.icon(page.icon or "article")
@@ -182,21 +211,21 @@ class SidebarLayout:
             ui.link(self._ctx.t("home.title"), "/").classes("ngui-current" if entry is self.home else "")
             if entry is not self.home:
                 ui.label("›")
-                ui.label(_text(entry.title)).classes("ngui-current")
+                ui.label(self._text(entry)).classes("ngui-current")
 
     def _home(self) -> None:
         t, theme = self._ctx.t, self._ctx.role("theme")
         with self.frame(self.home):
             theme.page_header(t("home.title"), t("home.description"))
-            pages = [p for p in self.pages if self._allowed(p)]
+            pages = [] if self.slots["main"] else [p for p in self.pages if self._allowed(p)]
             if self.slots["main"] or pages:
                 with ui.element("div").classes("ngui-grid"):
                     self._slot("main")
-                    for p in pages if not self.slots["main"] else []:
+                    for p in pages:
                         with ui.link(target=p.path).classes("ngui-page-link"):
                             with theme.card().classes("w-full"):
                                 ui.icon(p.icon or "article")
-                                ui.label(_text(p.title)).classes("ngui-card-title")
+                                ui.label(self._text(p)).classes("ngui-card-title")
 
 
 def setup(ctx) -> SidebarLayout:
