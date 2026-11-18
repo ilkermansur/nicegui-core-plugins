@@ -2,6 +2,9 @@ from nicegui import app, ui
 
 MODES = {"light": False, "dark": True, "auto": None}
 TONES = {"neutral", "primary", "success", "warning", "danger"}
+# Runs while the page is still being parsed, before Quasar's own dark-mode switch, so the first paint
+# already uses the dark colours instead of flashing the light background on every page load.
+EARLY_DARK = {"dark": "true", "light": "false", "auto": "matchMedia('(prefers-color-scheme: dark)').matches"}
 
 
 class DefaultTheme:
@@ -22,6 +25,7 @@ class DefaultTheme:
         if mode != self.mode:
             self._ctx.storage.set("mode", mode)
         ui.dark_mode(MODES[mode])
+        ui.add_body_html(f"<script>if ({EARLY_DARK[mode]}) document.body.classList.add('body--dark')</script>")
 
     def card(self, title: str | None = None, actions=None):
         card = ui.card().classes("ngui-card")

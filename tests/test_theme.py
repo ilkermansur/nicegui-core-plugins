@@ -42,7 +42,9 @@ class _Store(dict):
 def _theme(monkeypatch, **stored):
     mod = import_plugin("theme-default")
     monkeypatch.setattr(mod.ui, "dark_mode", lambda value: applied.append(value))
-    applied = []
+    monkeypatch.setattr(mod.ui, "add_body_html", lambda code: early.append(code))
+    applied, early = [], []
+    _theme.early = early
     store = _Store(stored)
     return mod.DefaultTheme(SimpleNamespace(storage=store)), store, applied
 
@@ -77,3 +79,12 @@ def test_dark_primary_beats_the_inline_light_value():
     css = (REPO / "theme-default" / "theme.css").read_text()
     assert "--q-primary: var(--ngui-primary) !important" in css
     assert "body.body--dark .q-btn.bg-primary .q-btn__content" in css
+
+
+@pytest.mark.parametrize("mode,condition", [
+    ("dark", "true"), ("light", "false"), ("auto", "matchMedia('(prefers-color-scheme: dark)').matches")])
+def test_dark_class_is_set_before_the_first_paint(monkeypatch, mode, condition):
+    # Quasar adds body--dark only after its JavaScript runs; without this the page paints light first
+    theme, _, _ = _theme(monkeypatch, mode=mode)
+    theme.set_mode(mode)
+    assert _theme.early == [f"<script>if ({condition}) document.body.classList.add('body--dark')</script>"]
