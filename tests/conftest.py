@@ -26,9 +26,10 @@ def home(tmp_path):
     return Home(tmp_path / "home")
 
 
-def _write_config(home: Home, plugins: list[str], roles: dict[str, str]) -> Config:
+def _write_config(home: Home, plugins: list[str], roles: dict[str, str],
+                  links: dict[str, str] | None = None, **fields) -> Config:
     cfg = Config(core_repo="", enabled=list(plugins), roles=dict(roles),
-                 links={p: str(REPO / p) for p in plugins})
+                 links={p: str(REPO / p) for p in plugins} | (links or {}), **fields)
     home.save_config(cfg)
     return cfg
 
@@ -56,12 +57,17 @@ def _is_up(url: str) -> bool:
         return False
 
 
-def fetch(url: str) -> str:
-    """HTTP body as text (NiceGUI 4 embeds its JSON payload in the page body)."""
+def fetch(url: str, ok_statuses: tuple[int, ...] = ()) -> str:
+    """HTTP body as text (NiceGUI 4 embeds its JSON payload in the page body).
+
+    An HTTP error status raises unless listed in `ok_statuses`.
+    """
     try:
         with urlopen(url, timeout=5) as r:
             return r.read().decode()
     except HTTPError as e:
+        if e.code not in ok_statuses:
+            raise
         return e.read().decode()
 
 
@@ -70,8 +76,9 @@ def start_app(tmp_path):
     procs = []
     log_path = tmp_path / "app.log"
 
-    def start(home: Home, plugins: list[str], roles: dict[str, str], env: dict[str, str] | None = None):
-        _write_config(home, plugins, roles)
+    def start(home: Home, plugins: list[str], roles: dict[str, str], env: dict[str, str] | None = None,
+              links: dict[str, str] | None = None, **config):
+        _write_config(home, plugins, roles, links, **config)
         port = _free_port()
         full = {k: v for k, v in os.environ.items() if k != "PYTEST_CURRENT_TEST"}
         full.update(env or {}, NGUI_HOME=str(home.root), NGUI_PORT=str(port), NGUI_CORE_REPO="")
@@ -87,6 +94,7 @@ def start_app(tmp_path):
             f"app failed to start; output:\n{log_path.read_text(errors='replace')}")
         return proc, url
 
+    start.log = lambda: log_path.read_text(errors="replace")
     yield start
     for proc in procs:
         proc.terminate()

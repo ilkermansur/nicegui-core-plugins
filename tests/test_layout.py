@@ -73,23 +73,13 @@ def setup(ctx):
 '''
 
 
-def test_async_page_is_awaited(home, tmp_path, start_app, monkeypatch):
-    import conftest
+def test_async_page_is_awaited(home, tmp_path, start_app):
     demo = tmp_path / "demo"
     (demo / "locales").mkdir(parents=True)
     names = '{ tr = "demo", en = "demo" }'
     (demo / "plugin.toml").write_text(f'id = "demo"\nversion = "0.1.0"\ncore = ">=1,<2"\n'
                                       f'name = {names}\ndescription = {names}\n')
     (demo / "__init__.py").write_text(DEMO_INIT)
-    orig = conftest._write_config
-
-    def write(h, plugins, roles):
-        cfg = orig(h, plugins, roles)
-        cfg.links["demo"] = str(demo)
-        h.save_config(cfg)
-        return cfg
-
-    monkeypatch.setattr(conftest, "_write_config", write)
-    _, url = start_app(home, [*PLUGINS_, "demo"], REAL_ROLES)
+    _, url = start_app(home, [*PLUGINS_, "demo"], REAL_ROLES, links={"demo": str(demo)})
     body = fetch(url + "/async")
     assert "async-page-rendered" in body and "ngui-rail" in body
