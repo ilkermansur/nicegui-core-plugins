@@ -57,6 +57,11 @@ def row_actions(row, self_id: str) -> list[str]:
     return [*acts, "purge"]
 
 
+def problem(row, broken: dict[str, str]) -> str:
+    """Why a plugin is not working: file problems from `status()`, or a setup() failure from this boot."""
+    return row.problem or broken.get(row.id, "")
+
+
 def short_commit(row, lock: dict) -> str:
     """Core plugins have no lock entry of their own; they show the core-plugins repo commit."""
     entry = lock.get(CORE_KEY) if row.source == "core" else None
@@ -163,8 +168,8 @@ class StorePage:
         ui.label(r.source)
         ui.label(r.role)
         ui.label(short_commit(r, self.lock))
-        if r.problem:
-            ui.label(r.problem).classes("ngui-tone-danger")
+        if why := problem(r, getattr(self.ctx.kernel.result, "broken", None) or {}):
+            ui.label(why).classes("ngui-tone-danger")
         else:
             ui.label(self.t("status.ok")).classes("ngui-tone-success")
         with ui.row().classes("ngui-store-actions gap-0 justify-end"):

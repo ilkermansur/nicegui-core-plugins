@@ -151,3 +151,12 @@ def test_core_store_shows_core_commit_rollback_and_description(home, start_app):
     body = fetch(url + "/store")
     assert "Core'u geri al" in body and "Core'u güncelle" in body and sha[:7] in body
     assert "SQLite depolama" in body and "Eklenti verisini SQLite dosyasında saklar." in body
+
+
+def test_problem_includes_setup_failures_found_at_boot():
+    # `ngui list` only sees problems in files; a setup() that raised is known only to the running app
+    broken = {"boom": "setup failed: RuntimeError: db down"}
+    assert store.problem(_row("boom"), broken) == "setup failed: RuntimeError: db down"
+    assert store.problem(_row("ok"), broken) == ""
+    file_problem = PluginStatus("bad", "repo", True, "", "", "invalid manifest: x")
+    assert store.problem(file_problem, {}) == "invalid manifest: x"
