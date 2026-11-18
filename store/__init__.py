@@ -7,10 +7,15 @@ from ngui.roles import ROLE_ORDER
 ACTIONS = {"add", "remove", "update", "rollback", "enable", "disable", "use"}
 COLUMNS = ("name", "source", "role", "commit", "status")
 
-GRID = "minmax(180px, 2fr) repeat(3, auto) minmax(120px, 1fr) auto"
+ICONS = {"enable": "toggle_off", "disable": "toggle_on", "update": "system_update",
+         "rollback": "history", "remove": "delete", "purge": "delete_sweep"}
+DANGER = {"remove", "purge"}
+GRID = "minmax(112px, 2fr) repeat(3, auto) minmax(64px, 1fr) auto"
 CSS = """
-.ngui-store-scroll { width: 100%; overflow-x: auto; }
-.ngui-store-scroll > .nicegui-grid { gap: 8px 16px; align-items: center; min-width: 760px; }
+.ngui-store-scroll { width: 100%; max-width: 100%; min-width: 0; overflow-x: auto; }
+.ngui-store-scroll > .nicegui-grid { gap: 8px 12px; align-items: center; }
+.ngui-store-actions .q-btn { color: var(--ngui-muted); }
+.ngui-store-actions .q-btn.ngui-store-danger { color: var(--ngui-danger); }
 .ngui-store-head { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--ngui-muted); }
 .ngui-store-id, .ngui-store-desc { font-size: 0.8125rem; color: var(--ngui-muted); }
 .ngui-store-line { width: 100%; border-top: 1px solid var(--ngui-border); padding-top: 8px; }
@@ -35,6 +40,18 @@ def role_options(manifests: dict, role: str, current: str | None, name) -> dict[
     if current and current not in options:
         options[current] = current
     return options
+
+
+def row_actions(row, self_id: str) -> list[str]:
+    """The actions the installed table offers for a `PluginStatus` row, in display order."""
+    acts = []
+    if not row.role and row.id != self_id:  # disabling the store itself would lock the user out
+        acts.append("disable" if row.enabled else "enable")
+    if row.source == "repo":
+        acts += ["update", "rollback"]
+        if not row.role and row.id != self_id:
+            acts.append("remove")
+    return [*acts, "purge"]
 
 
 class StorePage:
@@ -131,16 +148,22 @@ class StorePage:
             ui.label(r.problem).classes("ngui-tone-danger")
         else:
             ui.label(self.t("status.ok")).classes("ngui-tone-success")
-        with ui.row().classes("gap-1 no-wrap justify-end"):
-            if not r.role:
-                key = "disable" if r.enabled else "enable"
-                self._button(key, lambda r=r, key=key: self.act(key, r.id))
-            if r.source == "repo":
-                self._button("update", lambda r=r: self.act("update", r.id))
-                self._button("rollback", lambda r=r: self.act("rollback", r.id, confirm="confirm.rollback"))
-                if not r.role:
-                    self._button("remove", lambda r=r: self.act("remove", r.id, confirm="confirm.remove"))
-            self._button("purge", lambda r=r: self.purge(r.id))
+        with ui.row().classes("ngui-store-actions gap-0 justify-end"):
+            for key in row_actions(r, self.ctx.id):
+                self._icon_button(key, lambda key=key, pid=r.id: self._row_action(key, pid))
+
+    def _icon_button(self, key: str, on_click) -> None:
+        label = self.t(key)
+        btn = ui.button(icon=ICONS[key], on_click=on_click, color=None).props("flat dense round")
+        btn.props["aria-label"] = label
+        btn.classes("ngui-store-danger" if key in DANGER else "").tooltip(label)
+        self.controls.append(btn)
+
+    async def _row_action(self, key: str, pid: str) -> None:
+        if key == "purge":
+            await self.purge(pid)
+        else:
+            await self.act(key, pid, confirm=f"confirm.{key}" if key in ("remove", "rollback") else None)
 
     def _catalog(self) -> None:
         with self.theme.card(self.t("catalog")).classes("w-full"):

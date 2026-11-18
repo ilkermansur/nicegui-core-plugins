@@ -5,10 +5,10 @@ from conftest import PLUGINS, REAL_ROLES, fetch, import_plugin, make_kernel
 
 from ngui import NguiError
 from ngui.loader import load
-from ngui.manager import Manager
+from ngui.manager import Manager, PluginStatus
 
 store = import_plugin("store")
-run_action, role_options = store.run_action, store.role_options
+run_action, role_options, row_actions = store.run_action, store.role_options, store.row_actions
 
 
 class FakeManager:
@@ -57,6 +57,26 @@ def test_role_options_keeps_assigned_plugin_without_manifest():
     ms = {"a": SimpleNamespace(provides="theme")}
     assert role_options(ms, "theme", "broken", str.upper) == {"a": "A", "broken": "broken"}
     assert role_options(ms, "auth", None, str.upper) == {}
+
+
+def _row(pid="x", source="repo", enabled=True, role=""):
+    return PluginStatus(pid, source, enabled, role, "", "")
+
+
+def test_row_actions_repo_plugin():
+    assert row_actions(_row(), "store") == ["disable", "update", "rollback", "remove", "purge"]
+    assert row_actions(_row(enabled=False), "store")[0] == "enable"
+
+
+def test_row_actions_role_core_and_link():
+    assert row_actions(_row(role="theme"), "store") == ["update", "rollback", "purge"]
+    assert row_actions(_row(source="core"), "store") == ["disable", "purge"]
+    assert row_actions(_row(source="link", role="auth"), "store") == ["purge"]
+
+
+def test_row_actions_never_disable_or_remove_the_store_itself():
+    assert row_actions(_row("store"), "store") == ["update", "rollback", "purge"]
+    assert row_actions(_row("store", source="core"), "store") == ["purge"]
 
 
 def test_store_registers_page(home):
