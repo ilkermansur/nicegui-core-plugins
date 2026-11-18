@@ -26,7 +26,8 @@ def test_set_mode_validates(home):
 def test_css_tokens_light_and_dark():
     css = (REPO / "theme-default" / "theme.css").read_text()
     for var in ["--ngui-bg", "--ngui-surface", "--ngui-border", "--ngui-text", "--ngui-muted",
-                "--ngui-primary", "--ngui-success", "--ngui-warning", "--ngui-danger", "--ngui-neutral"]:
+                "--ngui-primary", "--ngui-success", "--ngui-warning", "--ngui-danger", "--ngui-neutral",
+                "--ngui-chart-1", "--ngui-chart-6", "--ngui-chart-grid"]:
         assert css.count(var + ":") >= 2, var
     assert "body.body--dark" in css
 
@@ -88,3 +89,48 @@ def test_dark_class_is_set_before_the_first_paint(monkeypatch, mode, condition):
     theme, _, _ = _theme(monkeypatch, mode=mode)
     theme.set_mode(mode)
     assert _theme.early == [f"<script>if ({condition}) document.body.classList.add('body--dark')</script>"]
+
+
+def _rendered_texts(monkeypatch, build):
+    # a tiny fake ui that records labels, icons and classes
+    mod = import_plugin("theme-default")
+    texts, classes = [], []
+
+    class El:
+        def __init__(self, text=""):
+            texts.append(text)
+
+        def classes(self, c):
+            classes.append(c)
+            return self
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    monkeypatch.setattr(mod.ui, "label", lambda text="": El(text))
+    monkeypatch.setattr(mod.ui, "icon", lambda name: El(name))
+    monkeypatch.setattr(mod.ui, "card", lambda: El())
+    monkeypatch.setattr(mod.ui, "row", lambda: El())
+    monkeypatch.setattr(mod.ui, "column", lambda: El())
+    build(mod.DefaultTheme(SimpleNamespace(storage={})))
+    return texts, " ".join(classes)
+
+
+def test_kpi_delta_and_trend(monkeypatch):
+    texts, classes = _rendered_texts(monkeypatch, lambda th: th.kpi("Orders", 332, delta="16 vs yesterday", trend="up"))
+    assert "16 vs yesterday" in texts and "arrow_drop_up" in texts and "ngui-trend-up" in classes
+
+
+def test_kpi_without_delta_has_no_delta_row(monkeypatch):
+    texts, classes = _rendered_texts(monkeypatch, lambda th: th.kpi("Orders", 332))
+    assert "ngui-kpi-delta" not in classes
+
+
+def test_card_meta_and_header_actions(monkeypatch):
+    called = []
+    texts, _ = _rendered_texts(monkeypatch, lambda th: (th.card("Revenue", meta="Last 30 days"),
+                                                        th.page_header("Dashboard", "Overview", actions=lambda: called.append(1))))
+    assert "Last 30 days" in texts and called == [1]

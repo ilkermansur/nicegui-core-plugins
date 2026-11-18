@@ -6,33 +6,39 @@ from dataclasses import dataclass
 
 from nicegui import ui
 
-SLOTS = ("nav", "header", "main", "statusbar")
+SLOTS = ("nav", "header", "main", "statusbar", "user")
 MODES = ("light", "dark", "auto")
 MODE_ICONS = {"light": "light_mode", "dark": "dark_mode", "auto": "brightness_auto"}
 
 CSS = """
 .q-header.ngui-topbar {
   background: var(--ngui-surface) !important; color: var(--ngui-text) !important;
-  border-bottom: 1px solid var(--ngui-border); padding: 8px 16px; align-items: center; gap: 8px;
+  border-bottom: 1px solid var(--ngui-border); padding: 8px 20px; align-items: center; gap: 6px;
 }
-.ngui-app-name { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.01em; }
+.ngui-app-name { font-size: 1.0625rem; font-weight: 700; letter-spacing: -0.01em; }
 .ngui-topbar .q-btn { color: var(--ngui-text); }
-.ngui-lang { color: var(--ngui-muted) !important; min-width: 0; padding: 0 6px; font-weight: 600; }
-.ngui-lang.ngui-active { color: var(--ngui-text) !important; }
-.ngui-user { border: 1px solid var(--ngui-border); border-radius: var(--ngui-radius); font-weight: 600; }
+.ngui-user { border: 1px solid var(--ngui-border); }
+.ngui-menu-head { padding: 10px 16px 6px; }
+.ngui-menu-name { font-weight: 600; font-size: 0.875rem; }
+.ngui-menu-sub { font-size: 0.75rem; color: var(--ngui-muted); }
 .q-drawer:has(> .ngui-rail) { background: var(--ngui-surface) !important; border-right: 1px solid var(--ngui-border); }
-.ngui-rail { gap: 4px; padding: 12px 8px; }
+.ngui-rail { gap: 4px; padding: 12px 10px; }
 .ngui-nav-item {
-  display: flex; align-items: center; gap: 12px; padding: 8px; border-radius: var(--ngui-radius);
-  color: var(--ngui-muted); text-decoration: none; white-space: nowrap; overflow: hidden;
+  position: relative; display: flex; align-items: center; gap: 12px; padding: 9px 10px;
+  border-radius: 8px; color: var(--ngui-muted); text-decoration: none; white-space: nowrap; overflow: hidden;
+  font-size: 0.875rem;
 }
-.ngui-nav-item .q-icon { font-size: 1.35rem; flex: none; }
-.ngui-nav-item:hover { color: var(--ngui-text); background: var(--ngui-bg); }
-.ngui-nav-item.ngui-active { color: var(--ngui-text); background: var(--ngui-bg); font-weight: 600; }
+.ngui-nav-item .q-icon { font-size: 1.25rem; flex: none; }
+.ngui-nav-item:hover { color: var(--ngui-text); background: var(--ngui-hover); }
+.ngui-nav-item.ngui-active { color: var(--ngui-text); background: var(--ngui-hover); font-weight: 600; }
+.ngui-nav-item.ngui-active::before {
+  content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px;
+  border-radius: 3px; background: var(--ngui-primary);
+}
 .ngui-rail .q-separator { background: var(--ngui-border) !important; border: 0; margin: 4px 0; }
 .ngui-rail-toggle { align-self: flex-start; color: var(--ngui-muted); margin-left: 4px; }
-.ngui-content { width: 100%; padding: var(--ngui-gap); gap: var(--ngui-gap); }
-.ngui-breadcrumb { font-size: 0.8125rem; color: var(--ngui-muted); gap: 6px; }
+.ngui-content { width: 100%; padding: 20px 28px 28px; gap: var(--ngui-gap); }
+.ngui-breadcrumb { font-size: 0.75rem; color: var(--ngui-muted); gap: 6px; }
 .ngui-breadcrumb a { color: var(--ngui-muted); text-decoration: none; }
 .ngui-breadcrumb .ngui-current { color: var(--ngui-text); font-weight: 600; }
 .ngui-grid {
@@ -146,11 +152,13 @@ class SidebarLayout:
             ui.space()
             self._slot("header")
             current = i18n.current_lang()
-            with ui.row().classes("items-center gap-0 no-wrap"):
-                for lang in i18n.languages():
-                    btn = ui.button(lang.upper(), on_click=lambda _, lang=lang: i18n.set_lang(lang), color=None)
-                    btn.props("flat dense").classes("ngui-lang" + (" ngui-active" if lang == current else ""))
-                    btn.tooltip(t("lang.switch"))
+            with ui.button(current.upper(), icon="language", color=None).props("flat dense").classes("ngui-lang"):
+                ui.tooltip(t("lang.switch"))
+                with ui.menu():
+                    for lang in i18n.languages():
+                        item = ui.item(t(f"lang.{lang}"), on_click=lambda _, lang=lang: i18n.set_lang(lang))
+                        if lang == current:
+                            item.classes("text-weight-bold")
             mode = theme.mode if theme.mode in MODES else "auto"
             nxt = MODES[(MODES.index(mode) + 1) % len(MODES)]
 
@@ -160,8 +168,14 @@ class SidebarLayout:
 
             ui.button(icon=MODE_ICONS[mode], on_click=cycle_theme, color=None).props("flat round dense").tooltip(
                 t("theme.toggle"))
-            name = self._ctx.role("auth").current_user()["name"]
-            ui.button(name, icon="person", color=None).props("flat no-caps dense").classes("ngui-user q-px-sm")
+            user = self._ctx.role("auth").current_user()
+            with ui.button(user["name"], icon="account_circle", color=None).props("flat dense icon-right=expand_more").classes(
+                    "ngui-user q-px-sm"):
+                with ui.menu():
+                    with ui.column().classes("ngui-menu-head gap-0"):
+                        ui.label(user["name"]).classes("ngui-menu-name")
+                        ui.label(", ".join(user.get("roles", [])) or "-").classes("ngui-menu-sub")
+                    self._slot("user")
 
     def _rail(self, entry: PageEntry) -> None:
         store = self._ctx.storage
